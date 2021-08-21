@@ -11,9 +11,9 @@
 ############################################################################
 
 import os
-import time
 import asyncio
 from contextlib import AsyncExitStack, asynccontextmanager
+import time
 import numpy as np
 
 from asyncio_mqtt import Client, MqttError
@@ -21,12 +21,16 @@ from asyncio_mqtt import Client, MqttError
 import board
 import neopixel
 
+FADESTEPS = 20
+FADETIME = 2.0
+step_time = FADETIME/FADESTEPS
+
 ORDER = neopixel.GRB # RGB
 PIXELCOUNT = int(os.environ['IOTPIXELS'])
 x_vals = np.linspace(-1.0, 1.0, PIXELCOUNT)
 
 MU = 0
-SIGMA = 0.25
+SIGMA = 0.05
 
 def gaussian(x, mu=MU, sig=SIGMA):
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
@@ -43,7 +47,7 @@ class LEDMapper:
         self.pixels = neopixel.NeoPixel(
             board.D18, PIXELCOUNT, brightness=0.2, auto_write=False, pixel_order=ORDER
         )
-        self.pixels.fill((0,0,0))
+        self.pixels.fill((0,0,0))   
         self.pixels.show()
         pass
 
@@ -58,19 +62,59 @@ class LEDMapper:
         # highlights is a list of tuples
         #   location: -1 to 1
         #   color: RGB value at peak
-        self.pixels.fill((0,0,0))
-        for highlight in highlights:
+        self.pixels.fill((0,0,0)) # remove this after testing fade
+        for highlight_string in highlights:
 
-            y_vals = gaussian(x_vals, mu=highlight[0]) # calc the dist with the input location as mean
-            for index in range(PIXELCOUNT):
-                y_val = y_vals[index]
-                current_pixel = self.pixels[index]
-                new_pixel_r = current_pixel[0] + y_val*highlight[1][0]
-                new_pixel_g = current_pixel[1] + y_val*highlight[1][1]
-                new_pixel_b = current_pixel[2] + y_val*highlight[1][2]
-                self.pixels(index) = (new_pixel_r, new_pixel_g, new_pixel_b)
+            highlight = highlight_string.split(',')
+            y_vals = gaussian(x_vals, mu=float(highlight[0])) # calc the dist with the input location as mean
+
+            for idx in range(PIXELCOUNT):
+                y_val = y_vals[idx]
+                current_pixel = self.pixels[idx]
+                new_pixel_g = current_pixel[0] + int(y_val*float(highlight[1]))
+                new_pixel_r = current_pixel[1] + int(y_val*float(highlight[2]))
+                new_pixel_b = current_pixel[2] + int(y_val*float(highlight[3]))
+                self.pixels[idx] = (new_pixel_g, new_pixel_r, new_pixel_b)
 
         self.pixels.show()
+
+    async def fade(self, highlights):
+        # highlights is a list of tuples
+        #   location: -1 to 1
+        #   color: RGB value at peak
+
+        # first calculate target values
+        original = []
+        goal = []
+        for idx in range(PIXELCOUNT):
+            original.append(self.pixels[idx])
+            goal.append((0,0,0))
+
+        for highlight_string in highlights:
+
+            highlight = highlight_string.split(',')
+            y_vals = gaussian(x_vals, mu=float(highlight[0])) # calc the dist with the input location as mean
+
+            for idx in range(PIXELCOUNT):
+                y_val = y_vals[idx]
+                current_pixel = goal[idx]
+                new_pixel_g = current_pixel[0] + int(y_val*float(highlight[1]))
+                new_pixel_r = current_pixel[1] + int(y_val*float(highlight[2]))
+                new_pixel_b = current_pixel[2] + int(y_val*float(highlight[3]))
+                goal[idx] = (new_pixel_g, new_pixel_r, new_pixel_b)
+
+
+        # now fade it in
+        for step in range(FADESTEPS):
+            weight = float(step + 1)/float(FADESTEPS)
+            for idx in range(PIXELCOUNT):
+                new_pixel_g = min(int(weight * goal[idx][0] + (1-weight) * original[idx][0]), 255)
+                new_pixel_r = min(int(weight * goal[idx][1] + (1-weight) * original[idx][1]), 255)
+                new_pixel_b = min(int(weight * goal[idx][2] + (1-weight) * original[idx][2]), 255)
+                self.pixels[idx] = (new_pixel_g, new_pixel_r, new_pixel_b)
+            self.pixels.show()
+            print(f"showing and then waiting {step_time}")
+            await asyncio.sleep(step_time)
 
     ############################################################################
     #  Define MQTT Setup coroutine
@@ -89,7 +133,7 @@ class LEDMapper:
 
             # create topic filters
             topic_filters = (
-                os.path.join(os.environ['GAME_TOPIC'], os.environ['NFC_DEVICE_NAME'],"LEDSTRIP", "#"),
+                os.path.join(os.environ['GAME_TOPIC'], os.environ['IOT_DEVICE_NAME'],"LEDSTRIP", "#"),
             )
 
             for topic_filter in topic_filters:
@@ -105,7 +149,7 @@ class LEDMapper:
             # await client.subscribe("iotbox/#")
             for topic_filter in topic_filters:
                 await self.client.subscribe(topic_filter)
-                logger.debug(f"Subscribed to {topic_filter}")
+                print(f"Subscribed to {topic_filter}")
 
             await asyncio.gather(*tasks)
 
@@ -131,15 +175,16 @@ class LEDMapper:
             # UTF8-encoded string (hence the `bytes.decode` call).
             topic = message.topic
             print(f"received topic: {topic}")
-            if topic == os.path.join(os.environ['GAME_TOPIC'], os.environ['NFC_DEVICE_NAME'],"LEDSTRIP"):
-                logger.debug(f"handling message: {message.topic} {message.payload.decode()}")
+            if topic == os.path.join(os.environ['GAME_TOPIC'], os.environ['IOT_DEVICE_NAME'],"LEDSTRIP"):
+                print(f"handling message: {message.topic} {message.payload.decode()}")
                 payload = message.payload.decode()
                 payload_list = payload.split(" ")
                 if payload_list[0] == "stop":
-                    logger.debug(f"Stopping: {self.current_proc}")
                     await self.stop()
                 elif payload_list[0] == "highlight":
-                    await self.highlight(payload_list[1])
+                    await self.highlight(payload_list[1:])
+                elif payload_list[0] == "fade":
+                    await self.fade(payload_list[1:])
             
 
     ############################################################################
@@ -159,7 +204,7 @@ class LEDMapper:
 #  MQTT loop setup
 ############################################################################
 async def main() -> None:
-    mapper = TeslaMapper()
+    mapper = LEDMapper()
     await mapper.ainit()
     await mapper.run()
 

@@ -9,12 +9,11 @@ zigbee/zwave lights are great but are power hungry and bulky.  If you want to pu
 
 # Usage
 
-    python3 -m venv env                  # create en env
-    source env/bin/activate              # activate
+    sudo su                              # unfortunately pi led stuff has to run as root
     pip install -r requirements.txt      # install requirements -- first time only
-    # run the app.  the IOTBOXNODENAME should be unique, will be used to address the node in the game
-    export $(grep -v '^#' iotgame.env | xargs) && IOTBOXNODENAME=ludwighouseaudio python3 mqtt_media.py
+    # run the app.  the IOT_DEVICE_NAME should be unique, will be used to address the node in the game
+    export $(grep -v '^#' iotgame.env | xargs) && IOT_DEVICE_NAME=bookshelfstrip python3 iotbox_led.py
 
 Then in a second terminal window
 
-    <!-- MEDIANODENAME=ludwighouseaudio mqtt pub -t iotbox/jhludwig/$(IOTBOXNODENAME)/AUDIO -m "play uri \"https://open.spotify.com/track/4noe32LLODXkYV5FqkTIKT?si=d73315f57cda4e37\" " -->
+    mqtt pub -t iotbox/jhludwig/bookshelfstrip/LEDSTRIP -m "highlight 0,128,0,0 .5,0,255,0"
