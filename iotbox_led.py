@@ -62,7 +62,7 @@ class LEDMapper:
         # highlights is a list of tuples
         #   location: -1 to 1
         #   color: RGB value at peak
-        self.pixels.fill((0,0,0)) # remove this after testing fade
+        self.pixels.fill((0,0,0)) 
         for highlight_string in highlights:
 
             highlight = highlight_string.split(',')
@@ -79,17 +79,16 @@ class LEDMapper:
         self.pixels.show()
 
     async def fade(self, highlights):
-        # highlights is a list of tuples
-        #   location: -1 to 1
-        #   color: RGB value at peak
+        # same as hughliught but fade to new 
 
-        # first calculate target values
+        # save current state and empty goal state
         original = []
         goal = []
         for idx in range(PIXELCOUNT):
             original.append(self.pixels[idx])
             goal.append((0,0,0))
 
+        # calculate goal state
         for highlight_string in highlights:
 
             highlight = highlight_string.split(',')
@@ -113,7 +112,6 @@ class LEDMapper:
                 new_pixel_b = min(int(weight * goal[idx][2] + (1-weight) * original[idx][2]), 255)
                 self.pixels[idx] = (new_pixel_g, new_pixel_r, new_pixel_b)
             self.pixels.show()
-            print(f"showing and then waiting {step_time}")
             await asyncio.sleep(step_time)
 
     ############################################################################
@@ -179,7 +177,7 @@ class LEDMapper:
                 print(f"handling message: {message.topic} {message.payload.decode()}")
                 payload = message.payload.decode()
                 payload_list = payload.split(" ")
-                if payload_list[0] == "stop":
+                if payload_list[0] in ["stop", "clear", "off"]:
                     await self.stop()
                 elif payload_list[0] == "highlight":
                     await self.highlight(payload_list[1:])

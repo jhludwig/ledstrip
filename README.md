@@ -17,3 +17,12 @@ zigbee/zwave lights are great but are power hungry and bulky.  If you want to pu
 Then in a second terminal window
 
     mqtt pub -t iotbox/jhludwig/bookshelfstrip/LEDSTRIP -m "highlight 0,128,0,0 .5,0,255,0"
+    mqtt pub -t iotbox/jhludwig/bookshelfstrip/LEDSTRIP -m "fade 0,45,45,0 .5,0,0,128"
+    mqtt pub -t iotbox/jhludwig/bookshelfstrip/LEDSTRIP -m "clear"
+
+# Notes
+
+- "clear" or "stop" commands are immediate, all values wiped 
+- "highlight" is immediate, new values instantly lighted.  highlight is destructive, any old values are forgotten
+- "fade" has same ultimate effect as highlight, but crossfades from current state to new state over 2 seconds.  it is destructive, the old state is fogotten.  
+  
