@@ -13,6 +13,7 @@
 import os
 import asyncio
 from contextlib import AsyncExitStack, asynccontextmanager
+import random
 import time
 import numpy as np
 
@@ -24,6 +25,8 @@ import neopixel
 FADESTEPS = 20
 FADETIME = 2.0
 step_time = FADETIME/FADESTEPS
+
+SPARKLESTEPS = 100
 
 ORDER = neopixel.GRB # RGB
 PIXELCOUNT = int(os.environ['IOTPIXELS'])
@@ -56,6 +59,18 @@ class LEDMapper:
 
     async def stop(self):
         self.pixels.fill((0,0,0))
+        self.pixels.show()
+
+    async def sparkle(self, target_arg):
+        target = target_arg.split(',')
+        tgrb = [int(t) for t in target]
+        for s in range(SPARKLESTEPS):
+            for p in range(PIXELCOUNT):
+                factor = random.random()
+                self.pixels[p] = (int(factor * tgrb[0]), int(factor * tgrb[1]), int(factor * tgrb[2]))
+            self.pixels.show()
+            await asyncio.sleep(step_time)
+        self.pixels.fill((0,0,0))   
         self.pixels.show()
 
     async def highlight(self, highlights):
@@ -183,6 +198,8 @@ class LEDMapper:
                     await self.highlight(payload_list[1:])
                 elif payload_list[0] == "fade":
                     await self.fade(payload_list[1:])
+                elif payload_list[0] == "sparkle":
+                    await self.sparkle(payload_list[1])
             
 
     ############################################################################
