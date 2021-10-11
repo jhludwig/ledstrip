@@ -29,7 +29,7 @@ step_time = FADETIME/FADESTEPS
 SPARKLESTEPS = 100
 
 ORDER = neopixel.GRB # RGB
-PIXELCOUNT = int(os.environ['IOTPIXELS'])
+PIXELCOUNT = int(os.environ['LED_PIXELS'])
 x_vals = np.linspace(-1.0, 1.0, PIXELCOUNT)
 
 MU = 0
@@ -140,13 +140,13 @@ class LEDMapper:
             stack.push_async_callback(self.cancel_tasks, tasks)
 
             # Connect to the MQTT broker
-            self.client = Client(hostname=os.environ['MQTTHOST'], username=os.environ['MQTTUSER'], password=os.environ['MQTTPASS'])
+            self.client = Client(hostname=os.environ['MQTT_HOST'], username=os.environ['MQTT_USER'], password=os.environ['MQTT_PASSWORD'])
             await stack.enter_async_context(self.client)
             print("Connected to MQTT")
 
             # create topic filters
             topic_filters = (
-                os.path.join(os.environ['GAME_TOPIC'], os.environ['IOT_DEVICE_NAME'],"LEDSTRIP", "#"),
+                os.path.join(os.environ['LED_TOPIC'], os.environ['LED_DEVICE_NAME'],"LEDSTRIP", "#"),
             )
 
             for topic_filter in topic_filters:
@@ -188,7 +188,7 @@ class LEDMapper:
             # UTF8-encoded string (hence the `bytes.decode` call).
             topic = message.topic
             print(f"received topic: {topic}")
-            if topic == os.path.join(os.environ['GAME_TOPIC'], os.environ['IOT_DEVICE_NAME'],"LEDSTRIP"):
+            if topic == os.path.join(os.environ['LED_TOPIC'], os.environ['LED_DEVICE_NAME'],"LEDSTRIP"):
                 print(f"handling message: {message.topic} {message.payload.decode()}")
                 payload = message.payload.decode()
                 payload_list = payload.split(" ")
